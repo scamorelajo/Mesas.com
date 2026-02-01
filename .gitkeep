@@ -1,0 +1,877 @@
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
+diff --git a/src/pages/Index.tsx b/src/pages/Index.tsx
+index 343b39c570eb0ded3947a599bebbdbc24d82f039..2448741c6c39debb7feb43540df5506f93909da8 100644
+--- a/src/pages/Index.tsx
++++ b/src/pages/Index.tsx
+@@ -1,348 +1,557 @@
+-import { useState } from 'react';
+-import Header from '@/components/Header';
+-import StatsCards from '@/components/StatsCards';
+-import NavigationTabs from '@/components/NavigationTabs';
+-import RoutinesSection from '@/components/RoutinesSection';
+-import HobbyExplorer from '@/components/HobbyExplorer';
+-import CourseSection from '@/components/CourseSection';
+-import GroupActivities from '@/components/GroupActivities';
+-import AddRoutineModal from '@/components/AddRoutineModal';
+-import NotificationCenter from '@/components/NotificationCenter';
+-import MainDashboard from '@/components/MainDashboard';
+-import CalendarView from '@/components/CalendarView';
+-import BadgesScreen from '@/components/BadgesScreen';
+-import SocialMap from '@/components/SocialMap';
+-import SettingsScreen from '@/components/SettingsScreen';
+-import BottomNavigation from '@/components/BottomNavigation';
+-import LoadingMotivation from '@/components/LoadingMotivation';
+-import { useToast } from '@/hooks/use-toast';
++import { useMemo, useState } from "react";
++import {
++  CalendarDays,
++  CheckCircle2,
++  Clock,
++  Coffee,
++  LayoutGrid,
++  MapPin,
++  Phone,
++  Users,
++} from "lucide-react";
++import { Badge } from "@/components/ui/badge";
++import { Button } from "@/components/ui/button";
++import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
++import { Input } from "@/components/ui/input";
++import { Label } from "@/components/ui/label";
++import {
++  Select,
++  SelectContent,
++  SelectItem,
++  SelectTrigger,
++  SelectValue,
++} from "@/components/ui/select";
++import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
++import { useToast } from "@/hooks/use-toast";
+ 
+-export interface Routine {
+-  id: string;
+-  title: string;
+-  description: string;
+-  time: string;
+-  streak: number;
+-  completed: boolean;
+-  category: 'morning' | 'evening' | 'daily' | 'hobby';
+-  thematicCategory?: 'Bienestar' | 'Creatividad' | 'Deporte' | 'Aprendizaje' | 'Productividad';
+-  isPremium?: boolean;
+-  expertCreator?: string;
+-  price?: number;
+-}
++const tableAreas = [
++  {
++    id: "terraza",
++    name: "Terraza",
++    description: "Vista a la plaza con ambiente al aire libre.",
++    capacityRange: "2-6 personas",
++  },
++  {
++    id: "salon",
++    name: "Salón principal",
++    description: "Zona interior con música ambiental.",
++    capacityRange: "2-8 personas",
++  },
++  {
++    id: "privado",
++    name: "Privado",
++    description: "Salas privadas para eventos especiales.",
++    capacityRange: "6-12 personas",
++  },
++];
+ 
+-export interface Course {
+-  id: string;
+-  title: string;
+-  description: string;
+-  category: string;
+-  thematicCategory?: 'Bienestar' | 'Creatividad' | 'Deporte' | 'Aprendizaje' | 'Productividad';
+-  totalLessons: number;
+-  completedLessons: number;
+-  estimatedHours: number;
+-  difficulty: 'Principiante' | 'Intermedio' | 'Avanzado';
+-  progress: number;
+-  nextLesson: string;
+-  isActive: boolean;
+-  isPremium?: boolean;
+-}
++const initialTables = [
++  { id: "T-01", area: "salon", capacity: 2, status: "Disponible" },
++  { id: "T-02", area: "salon", capacity: 4, status: "Ocupada" },
++  { id: "T-03", area: "salon", capacity: 6, status: "Disponible" },
++  { id: "T-11", area: "terraza", capacity: 2, status: "Disponible" },
++  { id: "T-12", area: "terraza", capacity: 4, status: "Limpieza" },
++  { id: "T-21", area: "privado", capacity: 8, status: "Disponible" },
++  { id: "T-22", area: "privado", capacity: 10, status: "Ocupada" },
++];
+ 
+-export interface GroupActivity {
+-  id: string;
+-  title: string;
+-  description: string;
+-  category: string;
+-  thematicCategory?: 'Bienestar' | 'Creatividad' | 'Deporte' | 'Aprendizaje' | 'Productividad';
+-  participants: number;
+-  maxParticipants: number;
+-  scheduledTime: string;
+-  duration: string;
+-  difficulty: 'Principiante' | 'Intermedio' | 'Avanzado';
+-  isJoined: boolean;
+-  nextSession: string;
+-  isPremium?: boolean;
+-}
+-
+-export interface Badge {
+-  id: string;
+-  name: string;
+-  description: string;
+-  level: 'Bronce' | 'Plata' | 'Oro' | 'Diamante';
+-  achieved: boolean;
+-  achievedDate?: string;
+-  progress: number;
+-  category: string;
+-}
++const initialReservations = [
++  {
++    id: "RES-1001",
++    name: "María López",
++    phone: "+34 612 345 678",
++    date: "2024-08-17",
++    time: "20:30",
++    guests: 4,
++    area: "salon",
++    table: "T-03",
++    status: "Confirmada",
++  },
++  {
++    id: "RES-1002",
++    name: "Carlos Vélez",
++    phone: "+34 622 987 654",
++    date: "2024-08-17",
++    time: "21:00",
++    guests: 2,
++    area: "terraza",
++    table: "T-11",
++    status: "Pendiente",
++  },
++  {
++    id: "RES-1003",
++    name: "Lucía Fernández",
++    phone: "+34 699 123 000",
++    date: "2024-08-18",
++    time: "13:30",
++    guests: 8,
++    area: "privado",
++    table: "T-21",
++    status: "Confirmada",
++  },
++];
+ 
+ const Index = () => {
+   const { toast } = useToast();
+-  const [currentScreen, setCurrentScreen] = useState<'home' | 'routines' | 'courses' | 'badges' | 'social' | 'settings'>('home');
+-  const [activeTab, setActiveTab] = useState<'routines' | 'hobbies' | 'courses' | 'groups'>('routines');
+-  const [isLoading, setIsLoading] = useState(false);
+-  
+-  const [routines, setRoutines] = useState<Routine[]>([
+-    {
+-      id: '1',
+-      title: 'Meditación matutina',
+-      description: '10 minutos de meditación al despertar',
+-      time: '07:00',
+-      streak: 7,
+-      completed: false,
+-      category: 'morning',
+-      thematicCategory: 'Bienestar',
+-      isPremium: false
+-    },
+-    {
+-      id: '2',
+-      title: 'Lectura nocturna',
+-      description: '30 minutos de lectura antes de dormir',
+-      time: '21:30',
+-      streak: 12,
+-      completed: false,
+-      category: 'evening',
+-      thematicCategory: 'Aprendizaje',
+-      isPremium: false
+-    },
+-    {
+-      id: '3',
+-      title: 'Ejercicio',
+-      description: 'Rutina de ejercicios de 45 minutos',
+-      time: '18:00',
+-      streak: 5,
+-      completed: true,
+-      category: 'daily',
+-      thematicCategory: 'Deporte',
+-      isPremium: false
+-    }
+-  ]);
++  const [tables] = useState(initialTables);
++  const [reservations, setReservations] = useState(initialReservations);
++  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
++  const [formData, setFormData] = useState({
++    name: "",
++    phone: "",
++    date: "",
++    time: "",
++    guests: "2",
++    area: "salon",
++  });
+ 
+-  const [courses, setCourses] = useState<Course[]>([
+-    {
+-      id: '1',
+-      title: 'Fundamentos de Guitarra',
+-      description: 'Aprende a tocar guitarra desde cero',
+-      category: 'Música',
+-      thematicCategory: 'Creatividad',
+-      totalLessons: 20,
+-      completedLessons: 8,
+-      estimatedHours: 40,
+-      difficulty: 'Principiante',
+-      progress: 40,
+-      nextLesson: 'Acordes básicos - Parte 3',
+-      isActive: true,
+-      isPremium: false
+-    },
+-    {
+-      id: '2',
+-      title: 'Pintura con Acuarelas',
+-      description: 'Técnicas básicas y avanzadas de acuarela',
+-      category: 'Arte',
+-      thematicCategory: 'Creatividad',
+-      totalLessons: 15,
+-      completedLessons: 3,
+-      estimatedHours: 25,
+-      difficulty: 'Intermedio',
+-      progress: 20,
+-      nextLesson: 'Mezcla de colores',
+-      isActive: true,
+-      isPremium: true
+-    }
+-  ]);
++  const stats = useMemo(() => {
++    const total = tables.length;
++    const available = tables.filter((table) => table.status === "Disponible").length;
++    const occupied = tables.filter((table) => table.status === "Ocupada").length;
++    return { total, available, occupied, upcoming: reservations.length };
++  }, [tables, reservations.length]);
+ 
+-  const [groupActivities, setGroupActivities] = useState<GroupActivity[]>([
+-    {
+-      id: '1',
+-      title: 'Club de Lectura',
+-      description: 'Discutimos libros de desarrollo personal',
+-      category: 'Literatura',
+-      thematicCategory: 'Aprendizaje',
+-      participants: 12,
+-      maxParticipants: 20,
+-      scheduledTime: 'Sábados 16:00',
+-      duration: '2 horas',
+-      difficulty: 'Principiante',
+-      isJoined: true,
+-      nextSession: '2024-07-06 16:00',
+-      isPremium: false
+-    },
+-    {
+-      id: '2',
+-      title: 'Grupo de Running',
+-      description: 'Corremos juntos por el parque central',
+-      category: 'Deporte',
+-      thematicCategory: 'Deporte',
+-      participants: 8,
+-      maxParticipants: 15,
+-      scheduledTime: 'Martes y Jueves 06:30',
+-      duration: '1 hora',
+-      difficulty: 'Intermedio',
+-      isJoined: false,
+-      nextSession: '2024-07-05 06:30',
+-      isPremium: false
++  const handleChange = (field: keyof typeof formData, value: string) => {
++    setFormData((prev) => ({ ...prev, [field]: value }));
++    if (field === "area") {
++      setSelectedTableId(null);
+     }
+-  ]);
++  };
++
++  const selectedTable = useMemo(
++    () => tables.find((table) => table.id === selectedTableId) ?? null,
++    [tables, selectedTableId],
++  );
+ 
+-  const [badges, setBadges] = useState<Badge[]>([
+-    {
+-      id: '1',
+-      name: 'Primer Paso',
+-      description: 'Completa tu primera rutina',
+-      level: 'Bronce',
+-      achieved: true,
+-      achievedDate: '2024-07-01',
+-      progress: 100,
+-      category: 'Rutinas'
+-    },
+-    {
+-      id: '2',
+-      name: 'Constancia',
+-      description: 'Mantén una racha de 7 días',
+-      level: 'Plata',
+-      achieved: false,
+-      progress: 60,
+-      category: 'Rutinas'
+-    },
+-    {
+-      id: '3',
+-      name: 'Maestro del Tiempo',
+-      description: 'Completa 100 rutinas',
+-      level: 'Oro',
+-      achieved: false,
+-      progress: 25,
+-      category: 'Rutinas'
++  const handleSubmit = (event: React.FormEvent) => {
++    event.preventDefault();
++
++    if (!formData.name || !formData.phone || !formData.date || !formData.time) {
++      toast({
++        title: "Campos incompletos",
++        description: "Completa todos los campos para reservar.",
++      });
++      return;
+     }
+-  ]);
+ 
+-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
++    const guests = Number(formData.guests);
++    const availableTable = selectedTableId
++      ? tables.find((table) => table.id === selectedTableId)
++      : tables.find(
++          (table) =>
++            table.area === formData.area &&
++            table.capacity >= guests &&
++            table.status === "Disponible",
++        );
+ 
+-  const handleNavigation = (screen: typeof currentScreen) => {
+-    setIsLoading(true);
+-    setTimeout(() => {
+-      setCurrentScreen(screen);
+-      setIsLoading(false);
+-    }, 1500);
+-  };
++    if (availableTable && availableTable.status !== "Disponible") {
++      toast({
++        title: "Mesa no disponible",
++        description: "Selecciona una mesa disponible o cambia de sección.",
++      });
++      return;
++    }
+ 
+-  const toggleRoutineComplete = (id: string) => {
+-    setRoutines(prev => prev.map(routine => 
+-      routine.id === id 
+-        ? { 
+-            ...routine, 
+-            completed: !routine.completed,
+-            streak: routine.completed ? routine.streak : routine.streak + 1
+-          }
+-        : routine
+-    ));
+-    
+-    const routine = routines.find(r => r.id === id);
+-    if (routine && !routine.completed) {
++    if (availableTable && availableTable.capacity < guests) {
+       toast({
+-        title: "¡Excelente!",
+-        description: `Has completado: ${routine.title}`,
++        title: "Capacidad insuficiente",
++        description: "La mesa seleccionada no alcanza para ese número de personas.",
+       });
++      return;
+     }
+-  };
+ 
+-  const addRoutine = (routine: Omit<Routine, 'id' | 'streak' | 'completed'>) => {
+-    const newRoutine: Routine = {
+-      ...routine,
+-      id: Date.now().toString(),
+-      streak: 0,
+-      completed: false
++    if (!availableTable) {
++      toast({
++        title: "Sin mesas disponibles",
++        description: "No hay mesas con esa capacidad. Prueba otra sección.",
++      });
++      return;
++    }
++
++    const newReservation = {
++      id: `RES-${Math.floor(1000 + Math.random() * 9000)}`,
++      name: formData.name,
++      phone: formData.phone,
++      date: formData.date,
++      time: formData.time,
++      guests,
++      area: formData.area,
++      table: availableTable.id,
++      status: "Confirmada",
+     };
+-    setRoutines(prev => [...prev, newRoutine]);
+-    toast({
+-      title: "Rutina agregada",
+-      description: `${routine.title} ha sido agregada a tus rutinas`,
++
++    setReservations((prev) => [newReservation, ...prev]);
++    setFormData({
++      name: "",
++      phone: "",
++      date: "",
++      time: "",
++      guests: "2",
++      area: "salon",
+     });
+-  };
+ 
+-  const deleteRoutine = (id: string) => {
+-    setRoutines(prev => prev.filter(routine => routine.id !== id));
+     toast({
+-      title: "Rutina eliminada",
+-      description: "La rutina ha sido eliminada exitosamente",
++      title: "Reserva creada",
++      description: `Mesa ${availableTable.id} asignada para ${newReservation.name}.`,
+     });
+   };
+ 
+-  const renderCurrentScreen = () => {
+-    switch (currentScreen) {
+-      case 'home':
+-        return (
+-          <MainDashboard 
+-            routines={routines}
+-            courses={courses}
+-            groupActivities={groupActivities}
+-            badges={badges}
+-            onNavigate={handleNavigation}
+-            onBadgesClick={() => setCurrentScreen('badges')}
+-          />
+-        );
+-      case 'routines':
+-        return (
+-          <div>
+-            <NavigationTabs 
+-              activeTab={activeTab}
+-              setActiveTab={setActiveTab}
+-            />
+-            {activeTab === 'routines' && (
+-              <RoutinesSection
+-                routines={routines}
+-                onToggleComplete={toggleRoutineComplete}
+-                onDelete={deleteRoutine}
+-                onAddNew={() => setIsAddModalOpen(true)}
+-              />
+-            )}
+-            {activeTab === 'hobbies' && (
+-              <HobbyExplorer 
+-                onAddHobby={addRoutine} 
+-                userRoutines={routines}
+-              />
+-            )}
+-            {activeTab === 'courses' && (
+-              <CourseSection courses={courses} setCourses={setCourses} />
+-            )}
+-            {activeTab === 'groups' && (
+-              <GroupActivities activities={groupActivities} setActivities={setGroupActivities} />
+-            )}
+-          </div>
+-        );
+-      case 'courses':
+-        return <CourseSection courses={courses} setCourses={setCourses} />;
+-      case 'badges':
+-        return <BadgesScreen badges={badges} />;
+-      case 'social':
+-        return <SocialMap />;
+-      case 'settings':
+-        return <SettingsScreen />;
+-      default:
+-        return null;
++  const handleTableSelect = (tableId: string) => {
++    const table = tables.find((item) => item.id === tableId);
++    if (!table) return;
++    if (table.status !== "Disponible") {
++      toast({
++        title: "Mesa en uso",
++        description: "Solo puedes seleccionar mesas disponibles.",
++      });
++      return;
++    }
++    setSelectedTableId(tableId);
++    setFormData((prev) => ({
++      ...prev,
++      area: table.area,
++      guests: String(Math.min(Number(prev.guests || 1), table.capacity)),
++    }));
++  };
++
++  const getStatusBadge = (status: string) => {
++    if (status === "Disponible") return "bg-emerald-500/15 text-emerald-600";
++    if (status === "Ocupada") return "bg-rose-500/15 text-rose-600";
++    return "bg-amber-500/15 text-amber-600";
++  };
++
++  const getReservationBadge = (status: string) =>
++    status === "Confirmada" ? "bg-emerald-500/15 text-emerald-700" : "bg-amber-500/15 text-amber-700";
++
++  const getTableButtonStyles = (table: (typeof tables)[number]) => {
++    if (table.status !== "Disponible") {
++      return "bg-white/5 text-slate-500 border-white/10 cursor-not-allowed";
++    }
++    if (table.id === selectedTableId) {
++      return "bg-emerald-400 text-slate-950 border-emerald-300";
+     }
++    return "bg-white/10 text-white border-white/10 hover:bg-emerald-400/20";
+   };
+ 
+   return (
+-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10">
+-      <Header onNavigate={(screen) => setCurrentScreen(screen)} />
+-      
+-      <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 pb-20 sm:pb-24 max-w-7xl">
+-        {renderCurrentScreen()}
+-      </main>
++    <div className="min-h-screen bg-slate-950 text-white">
++      <header className="border-b border-white/10 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950">
++        <div className="container mx-auto flex flex-col gap-4 px-4 py-8 md:flex-row md:items-center md:justify-between">
++          <div>
++            <Badge className="mb-3 bg-white/10 text-white" variant="secondary">
++              Reservas en tiempo real
++            </Badge>
++            <h1 className="text-3xl font-semibold md:text-4xl">Mesa Clara</h1>
++            <p className="mt-2 max-w-xl text-sm text-slate-300 md:text-base">
++              Gestiona reservas, asigna mesas y coordina eventos desde un solo panel.
++            </p>
++          </div>
++          <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200 shadow-xl">
++            <div className="flex items-center gap-2">
++              <MapPin className="h-4 w-4 text-emerald-300" />
++              Avenida Libertad 140, Madrid
++            </div>
++            <div className="flex items-center gap-2">
++              <Phone className="h-4 w-4 text-emerald-300" />
++              +34 912 500 123
++            </div>
++            <div className="flex items-center gap-2">
++              <Clock className="h-4 w-4 text-emerald-300" />
++              Abierto 12:00 - 00:00
++            </div>
++          </div>
++        </div>
++      </header>
+ 
+-      <BottomNavigation 
+-        currentScreen={currentScreen === 'badges' ? 'home' : currentScreen as 'home' | 'routines' | 'courses' | 'social' | 'settings'}
+-        onNavigate={handleNavigation}
+-      />
++      <main className="container mx-auto grid gap-6 px-4 py-8 lg:grid-cols-[1.2fr_0.8fr]">
++        <section className="space-y-6">
++          <div className="grid gap-4 md:grid-cols-4">
++            <Card className="border-white/10 bg-white/5 text-white">
++              <CardHeader className="pb-2">
++                <CardTitle className="text-sm text-slate-300">Mesas totales</CardTitle>
++              </CardHeader>
++              <CardContent className="text-2xl font-semibold">{stats.total}</CardContent>
++            </Card>
++            <Card className="border-white/10 bg-white/5 text-white">
++              <CardHeader className="pb-2">
++                <CardTitle className="text-sm text-slate-300">Disponibles</CardTitle>
++              </CardHeader>
++              <CardContent className="text-2xl font-semibold text-emerald-300">
++                {stats.available}
++              </CardContent>
++            </Card>
++            <Card className="border-white/10 bg-white/5 text-white">
++              <CardHeader className="pb-2">
++                <CardTitle className="text-sm text-slate-300">Ocupadas</CardTitle>
++              </CardHeader>
++              <CardContent className="text-2xl font-semibold text-rose-300">
++                {stats.occupied}
++              </CardContent>
++            </Card>
++            <Card className="border-white/10 bg-white/5 text-white">
++              <CardHeader className="pb-2">
++                <CardTitle className="text-sm text-slate-300">Reservas próximas</CardTitle>
++              </CardHeader>
++              <CardContent className="text-2xl font-semibold text-blue-200">
++                {stats.upcoming}
++              </CardContent>
++            </Card>
++          </div>
++
++          <Card className="border-white/10 bg-white/5 text-white">
++            <CardHeader>
++              <CardTitle className="flex items-center gap-2 text-lg">
++                <CalendarDays className="h-5 w-5 text-emerald-300" />
++                Reservas del día
++              </CardTitle>
++            </CardHeader>
++            <CardContent>
++              <Table>
++                <TableHeader>
++                  <TableRow className="border-white/10">
++                    <TableHead className="text-slate-300">Cliente</TableHead>
++                    <TableHead className="text-slate-300">Fecha</TableHead>
++                    <TableHead className="text-slate-300">Hora</TableHead>
++                    <TableHead className="text-slate-300">Comensales</TableHead>
++                    <TableHead className="text-slate-300">Mesa</TableHead>
++                    <TableHead className="text-slate-300">Estado</TableHead>
++                  </TableRow>
++                </TableHeader>
++                <TableBody>
++                  {reservations.map((reservation) => (
++                    <TableRow key={reservation.id} className="border-white/10">
++                      <TableCell className="font-medium text-white">
++                        <div className="flex flex-col">
++                          {reservation.name}
++                          <span className="text-xs text-slate-400">{reservation.phone}</span>
++                        </div>
++                      </TableCell>
++                      <TableCell>{reservation.date}</TableCell>
++                      <TableCell>{reservation.time}</TableCell>
++                      <TableCell>{reservation.guests}</TableCell>
++                      <TableCell>{reservation.table}</TableCell>
++                      <TableCell>
++                        <Badge className={getReservationBadge(reservation.status)} variant="secondary">
++                          {reservation.status}
++                        </Badge>
++                      </TableCell>
++                    </TableRow>
++                  ))}
++                </TableBody>
++              </Table>
++            </CardContent>
++          </Card>
++
++          <Card className="border-white/10 bg-white/5 text-white">
++            <CardHeader>
++              <CardTitle className="flex items-center gap-2 text-lg">
++                <LayoutGrid className="h-5 w-5 text-emerald-300" />
++                Mapa del restaurante
++              </CardTitle>
++            </CardHeader>
++            <CardContent className="space-y-6">
++              <div className="flex flex-wrap gap-2 text-xs text-slate-300">
++                <Badge className="bg-emerald-500/15 text-emerald-300" variant="secondary">
++                  Disponible
++                </Badge>
++                <Badge className="bg-rose-500/15 text-rose-300" variant="secondary">
++                  Ocupada
++                </Badge>
++                <Badge className="bg-amber-500/15 text-amber-300" variant="secondary">
++                  Limpieza
++                </Badge>
++                {selectedTable && (
++                  <Badge className="bg-emerald-400 text-slate-950" variant="secondary">
++                    Seleccionada: {selectedTable.id}
++                  </Badge>
++                )}
++              </div>
++              <div className="grid gap-4 lg:grid-cols-3">
++                {tableAreas.map((area) => (
++                  <div key={area.id} className="rounded-xl border border-white/10 bg-slate-950/40 p-4">
++                    <div className="mb-3">
++                      <p className="text-sm font-semibold">{area.name}</p>
++                      <p className="text-xs text-slate-400">{area.description}</p>
++                    </div>
++                    <div className="grid gap-2">
++                      {tables
++                        .filter((table) => table.area === area.id)
++                        .map((table) => (
++                          <Button
++                            key={table.id}
++                            type="button"
++                            variant="secondary"
++                            disabled={table.status !== "Disponible"}
++                            onClick={() => handleTableSelect(table.id)}
++                            className={`h-11 justify-between border ${getTableButtonStyles(table)}`}
++                          >
++                            <span className="text-sm font-semibold">{table.id}</span>
++                            <span className="text-xs">
++                              {table.capacity} pax · {table.status}
++                            </span>
++                          </Button>
++                        ))}
++                    </div>
++                  </div>
++                ))}
++              </div>
++            </CardContent>
++          </Card>
++        </section>
+ 
+-      <NotificationCenter />
+-      <LoadingMotivation isLoading={isLoading} />
++        <section className="space-y-6">
++          <Card className="border-white/10 bg-white/5 text-white">
++            <CardHeader>
++              <CardTitle className="flex items-center gap-2 text-lg">
++                <Users className="h-5 w-5 text-emerald-300" />
++                Nueva reserva
++              </CardTitle>
++            </CardHeader>
++            <CardContent>
++              <form className="space-y-4" onSubmit={handleSubmit}>
++                <div className="space-y-2">
++                  <Label className="text-slate-300">Nombre y apellidos</Label>
++                  <Input
++                    value={formData.name}
++                    onChange={(event) => handleChange("name", event.target.value)}
++                    placeholder="Ej: Ana Torres"
++                    className="border-white/10 bg-white/10 text-white placeholder:text-slate-500"
++                  />
++                </div>
++                <div className="space-y-2">
++                  <Label className="text-slate-300">Teléfono de contacto</Label>
++                  <Input
++                    value={formData.phone}
++                    onChange={(event) => handleChange("phone", event.target.value)}
++                    placeholder="Ej: +34 600 000 000"
++                    className="border-white/10 bg-white/10 text-white placeholder:text-slate-500"
++                  />
++                </div>
++                <div className="grid gap-4 md:grid-cols-2">
++                  <div className="space-y-2">
++                    <Label className="text-slate-300">Fecha</Label>
++                    <Input
++                      type="date"
++                      value={formData.date}
++                      onChange={(event) => handleChange("date", event.target.value)}
++                      className="border-white/10 bg-white/10 text-white"
++                    />
++                  </div>
++                  <div className="space-y-2">
++                    <Label className="text-slate-300">Hora</Label>
++                    <Input
++                      type="time"
++                      value={formData.time}
++                      onChange={(event) => handleChange("time", event.target.value)}
++                      className="border-white/10 bg-white/10 text-white"
++                    />
++                  </div>
++                </div>
++                <div className="grid gap-4 md:grid-cols-2">
++                  <div className="space-y-2">
++                    <Label className="text-slate-300">Personas</Label>
++                  <Input
++                    type="number"
++                    min={1}
++                    max={12}
++                    value={formData.guests}
++                    onChange={(event) => handleChange("guests", event.target.value)}
++                    className="border-white/10 bg-white/10 text-white"
++                  />
++                </div>
++                  <div className="space-y-2">
++                    <Label className="text-slate-300">Sección</Label>
++                    <Select value={formData.area} onValueChange={(value) => handleChange("area", value)}>
++                      <SelectTrigger className="border-white/10 bg-white/10 text-white">
++                        <SelectValue placeholder="Selecciona" />
++                      </SelectTrigger>
++                      <SelectContent className="border-white/10 bg-slate-900 text-white">
++                        {tableAreas.map((area) => (
++                          <SelectItem key={area.id} value={area.id}>
++                            {area.name}
++                          </SelectItem>
++                        ))}
++                      </SelectContent>
++                    </Select>
++                  </div>
++                </div>
++                {selectedTable && (
++                  <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-xs text-emerald-200">
++                    Mesa seleccionada: <span className="font-semibold">{selectedTable.id}</span> ·{" "}
++                    {selectedTable.capacity} pax · {selectedTable.status}
++                  </div>
++                )}
++                <Button className="w-full bg-emerald-400 text-slate-950 hover:bg-emerald-300">
++                  Confirmar reserva
++                </Button>
++              </form>
++            </CardContent>
++          </Card>
+ 
+-      <AddRoutineModal
+-        isOpen={isAddModalOpen}
+-        onClose={() => setIsAddModalOpen(false)}
+-        onAdd={addRoutine}
+-      />
++          <Card className="border-white/10 bg-white/5 text-white">
++            <CardHeader>
++              <CardTitle className="flex items-center gap-2 text-lg">
++                <Coffee className="h-5 w-5 text-emerald-300" />
++                Zonas disponibles
++              </CardTitle>
++            </CardHeader>
++            <CardContent className="space-y-4">
++              {tableAreas.map((area) => (
++                <div key={area.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
++                  <div className="flex items-center justify-between">
++                    <div>
++                      <h3 className="text-base font-semibold">{area.name}</h3>
++                      <p className="text-xs text-slate-400">{area.description}</p>
++                    </div>
++                    <Badge className="bg-white/10 text-slate-100" variant="secondary">
++                      {area.capacityRange}
++                    </Badge>
++                  </div>
++                  <div className="mt-3 flex flex-wrap gap-2">
++                    {tables
++                      .filter((table) => table.area === area.id)
++                      .map((table) => (
++                        <Badge
++                          key={table.id}
++                          className={getStatusBadge(table.status)}
++                          variant="secondary"
++                        >
++                          {table.id} · {table.capacity} pax · {table.status}
++                        </Badge>
++                      ))}
++                  </div>
++                </div>
++              ))}
++            </CardContent>
++          </Card>
++
++          <Card className="border-white/10 bg-white/5 text-white">
++            <CardHeader>
++              <CardTitle className="flex items-center gap-2 text-lg">
++                <CheckCircle2 className="h-5 w-5 text-emerald-300" />
++                Checklist operativo
++              </CardTitle>
++            </CardHeader>
++            <CardContent className="space-y-3 text-sm text-slate-200">
++              <div className="flex items-center gap-2">
++                <span className="h-2 w-2 rounded-full bg-emerald-400" />
++                Asignación automática de mesas según capacidad.
++              </div>
++              <div className="flex items-center gap-2">
++                <span className="h-2 w-2 rounded-full bg-emerald-400" />
++                Notificación interna para eventos privados.
++              </div>
++              <div className="flex items-center gap-2">
++                <span className="h-2 w-2 rounded-full bg-emerald-400" />
++                Control de estados: disponible, ocupada y limpieza.
++              </div>
++            </CardContent>
++          </Card>
++        </section>
++      </main>
+     </div>
+   );
+ };
+ 
+ export default Index;
+ 
+EOF
+)
